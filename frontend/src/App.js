@@ -14,7 +14,7 @@ function App() {
   const [recentGames, setRecentGames] = useState([]);
   const [loading, setLoading] = useState(false);
 
-
+  // Analyze PGN (file or text)
   const handleAnalyze = async (inputPGN = pgn) => {
     setLoading(true);
     try {
@@ -27,9 +27,9 @@ function App() {
       setCurrentMove(0);
     } catch (err) {
       alert("Analysis failed: " + err.message);
-    }finally {
-    setLoading(false); // Hide spinner
-  }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -41,16 +41,13 @@ function App() {
     setAnalysis([]);
     setRecentGames([]);
   };
+
   const playPrevious = () => {
-  if (currentMove > 0) {
-    setCurrentMove(currentMove - 1);
-  }
-};
+    if (currentMove > 0) setCurrentMove(currentMove - 1);
+  };
 
   const playNext = () => {
-    if (game && currentMove < game.length) {
-      setCurrentMove(currentMove + 1);
-    }
+    if (game && currentMove < game.length) setCurrentMove(currentMove + 1);
   };
 
   const getFEN = () => {
@@ -97,34 +94,32 @@ function App() {
   };
 
   return (
-    <div style={{ padding: "30px", fontFamily: "Segoe UI", backgroundColor: "#769656", minHeight: "100vh" }}>
-      <h1 style={{ textAlign: "center" }}>♟️ Chess Game Analyzer</h1>
+    <div className="app-container">
+      <h1 className="app-title">♟️ Chess Game Analyzer</h1>
 
-      <div style={{ maxWidth: 1000, margin: "auto", background: "white", padding: 20, borderRadius: 10 }}>
-        {/* Username Search */}
-        <div style={{ marginBottom: 20 }}>
+      <div className="main-card">
+        {/* Chess.com Username Input */}
+        <div className="section">
           <label><strong>🔎 Analyze Chess.com User:</strong></label><br />
           <input
             type="text"
             placeholder="Enter Chess.com username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            style={{ padding: "8px", width: "60%", marginRight: 10 }}
+            className="input-box"
           />
           <button className="btn btn-blue" onClick={handleFetchGames}>Fetch Games</button>
         </div>
 
         {/* Recent Games List */}
         {recentGames.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
+          <div className="section">
             <h3>Recent Games:</h3>
             <ul>
               {recentGames.map((g, idx) => (
-                <li key={idx} style={{ marginBottom: 10 }}>
+                <li key={idx} className="recent-game-item">
                   <strong>{g.white}</strong> vs <strong>{g.black}</strong> — {g.result} on {g.date}
-                  <button className="btn btn-green" onClick={() => handleAnalyze(g.pgn)} style={{ marginLeft: 10 }}>
-                    Analyze
-                  </button>
+                  <button className="btn btn-green" onClick={() => handleAnalyze(g.pgn)}>Analyze</button>
                 </li>
               ))}
             </ul>
@@ -132,66 +127,80 @@ function App() {
         )}
 
         {/* PGN Upload */}
-        <div>
+        <div className="section">
           <label><strong>📂 Upload PGN File:</strong></label><br />
           <input type="file" accept=".pgn" onChange={handleFileUpload} />
         </div>
 
-        <br />
+        {/* PGN Text Area */}
         <textarea
           value={pgn}
           onChange={(e) => setPgn(e.target.value)}
           rows={8}
           placeholder="Paste PGN here or upload"
-          style={{ width: "100%", padding: "10px", fontFamily: "monospace", borderRadius: 6, border: "1px solid #ccc" }}
+          className="pgn-box"
         />
 
-        <br />
+        {/* Analyze & Reset */}
         <div style={{ marginTop: 10 }}>
           <button className="btn btn-green" onClick={() => handleAnalyze()} style={{ marginRight: 10 }}>Analyze</button>
           <button className="btn btn-red" onClick={handleReset}>Reset</button>
-          {loading && (
-  <div className="spinner" />
+        </div>
+
+        {loading && <div className="spinner" />}
+
+        {/* Accuracy Display */}
+       {(whiteAccuracy !== null || blackAccuracy !== null) && (
+  <div className="accuracy-container">
+    <div className="accuracy-box">
+      <div className="accuracy-title">♔ White Accuracy</div>
+      <div className="accuracy-score">
+        {whiteAccuracy !== null ? `${whiteAccuracy}%` : "-"}
+      </div>
+    </div>
+    <div className="accuracy-box black">
+      <div className="accuracy-title">♚ Black Accuracy</div>
+      <div className="accuracy-score">
+        {blackAccuracy !== null ? `${blackAccuracy}%` : "-"}
+      </div>
+    </div>
+  </div>
 )}
 
-        </div>
-
-        {/* Accuracy Scores */}
-        <div style={{ marginTop: 20 }}>
-          <p style={{ fontSize: "16px" }}>♔ White Accuracy: <strong>{whiteAccuracy !== null ? `${whiteAccuracy}%` : "-"}</strong></p>
-          <p style={{ fontSize: "16px" }}>♚ Black Accuracy: <strong>{blackAccuracy !== null ? `${blackAccuracy}%` : "-"}</strong></p>
-        </div>
-
-        {/* Chessboard + Move List */}
-        <div style={{ display: "flex", gap: 20, marginTop: 20, flexWrap: "wrap" }}>
+        {/* Chessboard & Move List */}
+        <div className="chess-section">
           <Chessboard position={getFEN()} arePiecesDraggable={false} boardWidth={400} />
-          <div style={{ fontSize: "14px", maxHeight: "400px", overflowY: "auto", flex: 1, padding: 10, background: "#f9f9f9", borderRadius: 6 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div className="move-list">
+            <div className="move-grid">
               {(() => {
                 const movePairs = [];
-                for (let i = currentMove; i < analysis.length; i += 2) {
+                for (let i = 0; i < analysis.length; i += 2) {
                   const whiteMove = analysis[i];
                   const blackMove = analysis[i + 1];
 
                   movePairs.push(
                     <React.Fragment key={i}>
-                      <div style={{ padding: "5px", background: "#fff" }}>
+                      <div
+                        className="move-text"
+                        onClick={() => setCurrentMove(i + 1)}
+                      >
                         <strong>{whiteMove.move_number}.</strong> {whiteMove.move} →{" "}
                         <span style={getClassificationStyle(whiteMove.classification)}>
                           {whiteMove.classification}
                         </span>{" "}
                         {whiteMove.eval !== null ? `(${whiteMove.eval})` : ""}
                       </div>
-                      {blackMove ? (
-                        <div style={{ padding: "5px", background: "#fff" }}>
+                      {blackMove && (
+                        <div
+                          className="move-text"
+                          onClick={() => setCurrentMove(i + 2)}
+                        >
                           <strong>{blackMove.move_number}...</strong> {blackMove.move} →{" "}
                           <span style={getClassificationStyle(blackMove.classification)}>
                             {blackMove.classification}
                           </span>{" "}
                           {blackMove.eval !== null ? `(${blackMove.eval})` : ""}
                         </div>
-                      ) : (
-                        <div />
                       )}
                     </React.Fragment>
                   );
@@ -200,15 +209,14 @@ function App() {
               })()}
             </div>
 
-           {game && (
-  <div style={{ marginTop: 10, display: "flex", gap: "10px" }}>
-    <button className="btn btn-blue" onClick={playPrevious}>◀️ Previous Move</button>
-    {currentMove < game.length && (
-      <button className="btn btn-blue" onClick={playNext}>▶️ Next Move</button>
-    )}
-  </div>
-)}
-
+            {game && (
+              <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                <button className="btn btn-blue" onClick={playPrevious}>◀️ Previous</button>
+                {currentMove < game.length && (
+                  <button className="btn btn-blue" onClick={playNext}>▶️ Next</button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

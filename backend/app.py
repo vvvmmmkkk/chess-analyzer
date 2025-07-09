@@ -6,6 +6,7 @@ import io
 import os
 import requests
 import math
+import chess.polyglot
 from datetime import datetime
 
 app = Flask(__name__)
@@ -37,72 +38,80 @@ def analyze_game():
         white_score = black_score = 0
         white_total = black_total = 0
 
-        opening_cutoff_ply = 20  # First 10 full moves
-        brilliant_thresh = 10     # ≤ 10 centipawn loss
-        great_thresh = 10         # ≤ 10 centipawn loss
+        # Fallback cutoff if we don't use polyglot
+        eco_code = game.headers.get("ECO", "")
+        eco_move_cutoff = 12 if eco_code else 6
 
         for move in game.mainline_moves():
             is_white_to_move = board.turn
-            ply_number = board.ply()
             move_number = board.fullmove_number
 
-            info_before = engine.analyse(board, chess.engine.Limit(depth=15))
-            best_move = info_before["pv"][0]
-            best_score = (
-                info_before["score"].white().score(mate_score=10000)
-                if is_white_to_move else
-                info_before["score"].black().score(mate_score=10000)
-            )
+            try:
+                info_before = engine.analyse(board, chess.engine.Limit(depth=15))
+                best_move = info_before.get("pv", [None])[0]
+                best_score = info_before["score"].white().score(mate_score=10000) if is_white_to_move else info_before["score"].black().score(mate_score=10000)
+            except:
+                best_move = None
+                best_score = 0
 
-            # Save piece data BEFORE pushing
             moving_piece = board.piece_at(move.from_square)
             captured_piece = board.piece_at(move.to_square)
-
-            san_move = board.san(move)
+            san = board.san(move)
             board.push(move)
 
-            info_after = engine.analyse(board, chess.engine.Limit(depth=15))
-            actual_score = (
-                info_after["score"].white().score(mate_score=10000)
-                if is_white_to_move else
-                info_after["score"].black().score(mate_score=10000)
-            )
+            try:
+                info_after = engine.analyse(board, chess.engine.Limit(depth=15))
+                actual_score = info_after["score"].white().score(mate_score=10000) if is_white_to_move else info_after["score"].black().score(mate_score=10000)
+            except:
+                actual_score = best_score
 
             drop = best_score - actual_score if best_score is not None and actual_score is not None else 0
             score_percent = eval_to_score(abs(drop))
 
-            classification = "Best"
+            # ---- Classification ----
+            classification = "Best Move"
 
-            # --- Classification Logic ---
-            if ply_number <= opening_cutoff_ply:
+            if board.ply() < eco_move_cutoff * 2:
                 classification = "Book Move"
+
             elif (
                 captured_piece and moving_piece and
                 moving_piece.piece_type > captured_piece.piece_type and
-                abs(drop) <= brilliant_thresh and
+                abs(drop) <= 10 and
                 move != best_move and
-                score_percent >= 0.995
+                score_percent >= 0.997
             ):
                 classification = "Brilliant"
-                score_percent = 1.0
+
             elif (
                 move != best_move and
-                abs(drop) <= great_thresh and
-                score_percent >= 0.999 and
-                ply_number > opening_cutoff_ply and
-                abs(actual_score - best_score) <= 20 and
-                not san_move.startswith("K") and
-                not san_move[0].islower()  # filters out basic pawn moves like a4, h6
+                abs(drop) <= 20 and
+                score_percent >= 0.99 and
+                not san.startswith("K") and
+                not san[0].islower() and
+                not san.startswith("O-O")
             ):
                 classification = "Great Move"
-            elif move != best_move and abs(drop) <= 100:
-                classification = "Good Move"
-            elif drop <= 300:
+
+            elif move == best_move:
+                classification = "Best Move"
+
+            elif abs(drop) <= 50:
+                classification = "Excellent"
+
+            elif abs(drop) <= 100:
+                classification = "Good"
+
+            elif abs(drop) <= 300:
                 classification = "Inaccuracy"
+
+            elif abs(drop) <= 700:
+                classification = "Mistake"
+
             else:
                 classification = "Blunder"
 
-            # --- Accuracy Accumulation ---
+            # --- Accuracy Aggregation ---
             if classification != "Book Move":
                 if is_white_to_move:
                     white_score += score_percent
@@ -113,7 +122,7 @@ def analyze_game():
 
             analysis.append({
                 "move_number": move_number,
-                "move": san_move,
+                "move": san,
                 "classification": classification,
                 "eval": actual_score
             })
@@ -131,6 +140,7 @@ def analyze_game():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/fetch_chesscom_pgn', methods=['POST'])
 def fetch_chesscom_pgn():
